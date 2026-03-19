@@ -514,18 +514,16 @@ canvas.addEventListener('click', (e) => {
   const cy = (e.clientY - rect.top)  * scaleY;
 
   // 检查互动按钮点击
-  if (cx >= BTN_INTERACT.x && cx <= BTN_INTERACT.x + BTN_INTERACT.w &&
-      cy >= BTN_INTERACT.y && cy <= BTN_INTERACT.y + BTN_INTERACT.h) {
+  if (cx >= iBtn.x && cx <= iBtn.x + iBtn.w &&
+      cy >= iBtn.y && cy <= iBtn.y + iBtn.h) {
     if (activeInteraction) {
-      // 结束当前互动
       activeInteraction = null;
       manualMode = false; pickTarget(myAgent);
       setStatus('✅ 结束互动，恢复自动游走');
     } else if (nearInteractionObj) {
-      // 开始新互动
       activeInteraction = { ...nearInteractionObj, startFrame: frameCount };
       manualMode = true; myAgent.state = 'idle';
-      setStatus(`✨ ${nearInteractionObj.label.replace(/^[^\s]+\s/,'')}中...`);
+      setStatus(`✨ 开始${nearInteractionObj.label.slice(2)}...`);
     }
     return;
   }
@@ -722,6 +720,11 @@ function pickTarget(a) {
 function updateAgent(a) {
   a.frame++;
   if (a.state==='chatting') { if(--a.chatTimer<=0){a.state='idle';a.idleTimer=60+Math.random()*80;} return; }
+  // 互动中：锁定在设施位置保持idle
+  if (a.isPlayer && activeInteraction) {
+    a.x = activeInteraction.x; a.y = activeInteraction.y;
+    a.state = 'idle'; return;
+  }
   // 手动模式：到达目标后停止，不再 pickTarget
   if (a.isPlayer && manualMode) {
     const dx=a.targetX-a.x, dy=a.targetY-a.y, dist=Math.sqrt(dx*dx+dy*dy);
@@ -1006,20 +1009,40 @@ function checkAdventure() {
 }
 
 // =============================================
-// 互动设施（秋千 / 摩天轮 / 观星台）
+// 互动设施（坐标基于游戏画面实际像素 W≈1028 H≈561）
 // =============================================
+// 左图物件坐标（原图×0.73）：
+//   喷泉广场长椅群：(365,300)  花园椅:(430,330)
+// 右图物件坐标：
+//   篝火:(405,226)  摩天轮:(843,292)  观星台:(934,88)
 const INTERACT_OBJECTS = [
-  { id:'swing',    label:'🎠 荡秋千',  map:'left',  x:745, y:410, radius:55, duration:480 },
-  { id:'ferris',   label:'🎡 乘摩天轮', map:'right', x:985, y:330, radius:65, duration:600 },
-  { id:'stardeck', label:'🔭 看星星',  map:'right', x:880, y:120, radius:55, duration:420 },
+  { id:'bench1',   label:'💺 坐下休息',  map:'left',  x:365, y:300, radius:50, duration:600 },
+  { id:'bench2',   label:'💺 坐下休息',  map:'left',  x:430, y:330, radius:50, duration:600 },
+  { id:'ferris',   label:'🎡 乘摩天轮', map:'right', x:843, y:292, radius:70, duration:600 },
+  { id:'campfire', label:'🔥 围篝火',   map:'right', x:405, y:226, radius:60, duration:480 },
+  { id:'stardeck', label:'🔭 看星星',   map:'right', x:934, y:88,  radius:55, duration:420 },
 ];
+
 let activeInteraction  = null; // { ...obj, startFrame }
 let nearInteractionObj = null;
-const BTN_INTERACT = { x:0, y:0, w:0, h:0 };
+let iBtn = { x:0, y:0, w:0, h:0 }; // 互动按钮点击区（画布坐标）
+
+function drawIBtn(cx, cy, text, bg, border, textColor) {
+  const bw = text.length * 11 + 16, bh = 22;
+  const bx = cx - bw/2, by = cy - bh/2;
+  iBtn.x = bx; iBtn.y = by; iBtn.w = bw; iBtn.h = bh;
+  ctx.save();
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.fill();
+  ctx.strokeStyle = border; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.stroke();
+  ctx.fillStyle = textColor; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(text, cx, by + 15);
+  ctx.restore();
+}
 
 function checkInteractions() {
   if (!myAgent) return;
-  // Auto-end when duration expires
   if (activeInteraction && frameCount - activeInteraction.startFrame > activeInteraction.duration) {
     activeInteraction = null;
     manualMode = false; pickTarget(myAgent);
@@ -1034,113 +1057,114 @@ function checkInteractions() {
   }
 }
 
-function roundRect(c, x, y, w, h, r) {
-  c.beginPath();
-  c.moveTo(x+r, y);
-  c.lineTo(x+w-r, y); c.arcTo(x+w,y, x+w,y+r, r);
-  c.lineTo(x+w, y+h-r); c.arcTo(x+w,y+h, x+w-r,y+h, r);
-  c.lineTo(x+r, y+h); c.arcTo(x,y+h, x,y+h-r, r);
-  c.lineTo(x, y+r); c.arcTo(x,y, x+r,y, r);
-  c.closePath();
-}
-
 function drawFerrisAnim(inter, elapsed) {
-  const cx = inter.x, cy = inter.y - 50;
-  const r = 38, rot = elapsed * 0.012;
+  const cx = inter.x, cy = inter.y - 40;
+  const r = 42, rot = elapsed * 0.012;
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,180,30,0.9)'; ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255,180,30,0.85)'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,180,30,0.55)'; ctx.lineWidth = 1.5;
-  for (let i=0;i<6;i++) {
-    const a = rot + i*Math.PI/3;
-    ctx.beginPath(); ctx.moveTo(cx,cy);
-    ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,180,30,0.5)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i++) {
+    const a = rot + i * Math.PI / 3;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a)*r, cy + Math.sin(a)*r); ctx.stroke();
   }
-  const gColors = ['#ff6b9d','#6bffd9','#ffd96b','#6b9dff','#ff9d6b','#9dff6b'];
-  for (let i=0;i<6;i++) {
-    const a = rot + i*Math.PI/3;
-    const gx = cx+Math.cos(a)*r, gy = cy+Math.sin(a)*r;
-    ctx.fillStyle = gColors[i];
-    roundRect(ctx, gx-5, gy-4, 10, 8, 2); ctx.fill();
+  const gc = ['#ff6b9d','#6bffd9','#ffd96b','#6b9dff','#ff9d6b','#9dff6b'];
+  for (let i = 0; i < 6; i++) {
+    const a = rot + i * Math.PI / 3;
+    const gx = cx + Math.cos(a)*r, gy = cy + Math.sin(a)*r;
+    ctx.fillStyle = gc[i];
+    ctx.fillRect(gx-5, gy-4, 10, 8);
   }
-  // Axle
-  ctx.fillStyle='rgba(255,180,30,0.9)';
-  ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ffb41e';
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
-function drawSwingAnim(inter, elapsed) {
-  const cx = inter.x, topY = inter.y - 45;
-  const angle = Math.sin(elapsed * 0.06) * 0.5;
-  const ropeLen = 32;
+function drawCampfireAnim(inter, elapsed) {
+  const cx = inter.x, cy = inter.y;
   ctx.save();
-  ctx.strokeStyle = '#9a6830'; ctx.lineWidth = 2;
-  for (const dx of [-10, 10]) {
+  // 火焰层：用多个椭圆叠加，颜色从黄→橙→红，高度随sin波动
+  const layers = [
+    { color:'rgba(255,240,80,0.7)',  ry:12, rx:7,  dy:0 },
+    { color:'rgba(255,140,20,0.75)', ry:16, rx:5,  dy:-4 },
+    { color:'rgba(255,50,10,0.6)',   ry:10, rx:4,  dy:-8 },
+  ];
+  const flicker = Math.sin(elapsed * 0.3) * 0.15;
+  for (const l of layers) {
+    ctx.fillStyle = l.color;
     ctx.beginPath();
-    ctx.moveTo(cx+dx, topY);
-    ctx.lineTo(cx+dx + Math.sin(angle)*ropeLen, topY + Math.cos(angle)*ropeLen);
-    ctx.stroke();
+    ctx.ellipse(cx + Math.sin(elapsed*0.15)*2, cy + l.dy - Math.abs(Math.sin(elapsed*0.2))*3,
+      l.rx * (1 + flicker), l.ry * (1 + flicker), 0, 0, Math.PI*2);
+    ctx.fill();
   }
-  const sx = cx + Math.sin(angle)*ropeLen;
-  const sy = topY + Math.cos(angle)*ropeLen;
-  ctx.fillStyle = '#5a3a1a';
-  ctx.fillRect(sx-13, sy, 26, 5);
+  // 火花粒子
+  ctx.fillStyle = 'rgba(255,200,50,0.9)';
+  for (let i = 0; i < 5; i++) {
+    const t = (elapsed * 0.04 + i * 1.3) % 1;
+    const px = cx + Math.sin(i * 2.4) * 8 * t;
+    const py = cy - t * 22;
+    ctx.beginPath(); ctx.arc(px, py, 1.5 * (1-t), 0, Math.PI*2); ctx.fill();
+  }
+  // 光晕
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 28);
+  grad.addColorStop(0, 'rgba(255,160,0,0.18)');
+  grad.addColorStop(1, 'rgba(255,100,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(cx, cy, 28, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
 function drawStardeckAnim(inter, elapsed) {
   ctx.save();
-  ctx.font = '12px serif'; ctx.textAlign = 'center';
-  for (let i=0;i<7;i++) {
-    const a = elapsed*0.02 + i*Math.PI*(2/7);
-    const r = 18 + (i%3)*12;
-    const sx = inter.x + Math.cos(a)*r;
-    const sy = inter.y - 28 + Math.sin(a)*r*0.4;
-    const alpha = 0.55 + 0.45*Math.sin(elapsed*0.08 + i*1.3);
-    ctx.fillStyle = `rgba(255,255,180,${alpha})`;
+  ctx.font = '13px serif'; ctx.textAlign = 'center';
+  for (let i = 0; i < 8; i++) {
+    const a = elapsed * 0.015 + i * Math.PI * 0.25;
+    const r = 16 + (i % 3) * 10;
+    const sx = inter.x + Math.cos(a) * r;
+    const sy = inter.y - 20 + Math.sin(a) * r * 0.35;
+    const alpha = 0.5 + 0.5 * Math.sin(elapsed * 0.1 + i * 1.2);
+    ctx.fillStyle = `rgba(255,255,200,${alpha})`;
     ctx.fillText('★', sx, sy);
   }
   ctx.restore();
 }
 
+function drawBenchAnim(inter, elapsed) {
+  // 坐下时在椅子位置画一个小的"zzz"气泡
+  ctx.save();
+  ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  const alpha = 0.6 + 0.4 * Math.sin(elapsed * 0.08);
+  ctx.fillStyle = `rgba(200,230,255,${alpha})`;
+  ctx.fillText('z z z', inter.x, inter.y - 30 - Math.sin(elapsed * 0.05) * 4);
+  ctx.restore();
+}
+
 function drawInteractables() {
-  // Active animation
-  if (activeInteraction) {
+  // 正在互动中：画动画 + 结束按钮
+  if (activeInteraction && myAgent) {
     const el = frameCount - activeInteraction.startFrame;
-    if (activeInteraction.id === 'ferris')   drawFerrisAnim(activeInteraction, el);
-    else if (activeInteraction.id === 'swing') drawSwingAnim(activeInteraction, el);
-    else if (activeInteraction.id === 'stardeck') drawStardeckAnim(activeInteraction, el);
-    // Stop button above player
-    if (myAgent) {
-      BTN_INTERACT.x = myAgent.x-30; BTN_INTERACT.y = myAgent.y-50;
-      BTN_INTERACT.w = 60; BTN_INTERACT.h = 20;
-      ctx.save();
-      ctx.fillStyle='rgba(70,10,10,0.88)';
-      roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 7); ctx.fill();
-      ctx.strokeStyle='#ff5555'; ctx.lineWidth=1;
-      roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 7); ctx.stroke();
-      ctx.fillStyle='#ffaaaa'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('结束互动', myAgent.x, BTN_INTERACT.y+14);
-      ctx.restore();
-    }
+    const id = activeInteraction.id;
+    if (id === 'ferris')   drawFerrisAnim(activeInteraction, el);
+    else if (id === 'campfire') drawCampfireAnim(activeInteraction, el);
+    else if (id === 'stardeck') drawStardeckAnim(activeInteraction, el);
+    else drawBenchAnim(activeInteraction, el);
+    // 结束按钮显示在玩家头顶
+    drawIBtn(myAgent.x, myAgent.y - 58, '✋ 结束互动',
+      'rgba(60,10,10,0.90)', '#ff5555', '#ffbbbb');
   }
-  // Proximity prompt
+  // 靠近提示：虚线圆 + 操作按钮
   if (nearInteractionObj && myAgent) {
     const obj = nearInteractionObj;
+    const pulse = 0.4 + 0.3 * Math.sin(frameCount * 0.12);
     ctx.save();
-    ctx.strokeStyle=`rgba(255,220,50,${0.45+0.35*Math.sin(frameCount*0.1)})`;
-    ctx.lineWidth=2; ctx.setLineDash([5,5]);
+    ctx.strokeStyle = `rgba(255,220,50,${pulse})`;
+    ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
     ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI*2); ctx.stroke();
     ctx.setLineDash([]);
-    BTN_INTERACT.x = myAgent.x-42; BTN_INTERACT.y = myAgent.y-52;
-    BTN_INTERACT.w = 84; BTN_INTERACT.h = 23;
-    ctx.fillStyle='rgba(10,10,40,0.92)';
-    roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 8); ctx.fill();
-    ctx.strokeStyle='#FFD700'; ctx.lineWidth=1.5;
-    roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 8); ctx.stroke();
-    ctx.fillStyle='#FFD700'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(obj.label, myAgent.x, BTN_INTERACT.y+16);
     ctx.restore();
+    drawIBtn(myAgent.x, myAgent.y - 58, obj.label,
+      'rgba(10,10,40,0.92)', '#FFD700', '#FFD700');
   }
 }
 
