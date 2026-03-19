@@ -178,6 +178,68 @@
     /* 空状态 */
     .board-empty { color:#333; text-align:center; padding:40px 0; font-size:14px; line-height:3; }
 
+    /* ===== 奇遇事件卡片 ===== */
+    .adv-card {
+      background:#180f2a; border:1px solid #7a3aaa; border-radius:8px;
+      padding:10px 12px; margin-bottom:8px;
+    }
+    .adv-card:first-child { border-color:#cc66ff; background:#1e1040; }
+    .adv-header { display:flex; justify-content:space-between; margin-bottom:4px; }
+    .adv-icon   { font-size:16px; }
+    .adv-time   { color:#555; font-size:10px; }
+    .adv-loc    { color:#cc88ff; font-size:10px; margin-bottom:5px; }
+    .adv-body   { color:#e0c8ff; font-size:12px; line-height:1.8; }
+    .adv-effect { font-size:11px; margin-top:6px; padding:4px 8px; border-radius:4px; background:#0d0820; }
+    .adv-effect.pos { color:#4ade80; }
+    .adv-effect.neg { color:#f87171; }
+
+    /* ===== 角色面板 ===== */
+    #char-panel {
+      background:#0a0a1e; border:2px solid #2a2a5e; border-radius:8px;
+      overflow:hidden; transition:all 0.3s;
+    }
+    .panel-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 12px; background:#0f0f28; border-bottom:1px solid #1a1a40;
+    }
+    .panel-title { font-size:13px; color:#FFD700; letter-spacing:1px; }
+    .panel-toggle {
+      background:none; border:1px solid #3a3a6a; border-radius:4px;
+      color:#6666aa; font-size:11px; cursor:pointer; padding:2px 7px;
+    }
+    .panel-toggle:hover { border-color:#6060cc; color:#aaaaee; }
+    .panel-body { padding:10px 12px; display:flex; gap:12px; align-items:flex-start; }
+    .panel-body.hidden { display:none; }
+    #char-panel-canvas {
+      image-rendering:pixelated; border:1px solid #3a3a6a; border-radius:6px;
+      background:#161636; width:64px; height:64px; display:block; flex-shrink:0;
+    }
+    .panel-info { flex:1; display:flex; flex-direction:column; gap:3px; }
+    .panel-info-row { display:flex; gap:6px; align-items:baseline; }
+    .panel-info-label { font-size:10px; color:#555588; width:28px; flex-shrink:0; }
+    .panel-info-val   { font-size:12px; color:#c8c8e8; }
+    /* 状态栏 */
+    .status-stats { display:flex; flex-direction:column; gap:4px; margin-top:4px; }
+    .stat-row { display:flex; align-items:center; gap:6px; }
+    .stat-label { font-size:10px; color:#555588; width:28px; }
+    .stat-bar-bg { flex:1; height:6px; background:#1a1a3a; border-radius:3px; overflow:hidden; }
+    .stat-bar-fill { height:100%; border-radius:3px; transition:width 0.5s; }
+    .stat-val { font-size:10px; color:#8888bb; width:28px; text-align:right; }
+
+    /* ===== 面板折叠按钮（通用） ===== */
+    .section-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:6px 10px 4px;
+    }
+    .section-label { font-size:12px; color:#555588; }
+    .collapse-btn {
+      background:none; border:1px solid #2a2a5a; border-radius:4px;
+      color:#555588; font-size:11px; cursor:pointer; padding:1px 7px;
+    }
+    .collapse-btn:hover { border-color:#5050aa; color:#9090cc; }
+    .collapsible { transition:all 0.25s; }
+    .collapsible.collapsed { display:none; }
+
     /* 居民列表 */
     .char-list { background:#0a0a1e; border:2px solid #2a2a5e; border-radius:6px; padding:12px; }
     .char-list-title { font-size:13px; color:#666; margin-bottom:8px; }
@@ -337,14 +399,29 @@
   </div>
 
   <div class="bulletin-section">
+    <!-- 角色面板 -->
+    <div id="char-panel">
+      <div class="panel-header">
+        <span class="panel-title">🧑 我的角色</span>
+        <button class="panel-toggle" onclick="toggleCharPanel()">收起</button>
+      </div>
+      <div class="panel-body" id="char-panel-body">
+        <canvas id="char-panel-canvas" width="64" height="64"></canvas>
+        <div class="panel-info" id="char-panel-info">
+          <div style="color:#444;font-size:12px">进入小镇后显示</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab 切换 -->
     <div class="board-tabs">
       <button class="board-tab active" id="tab-pub"     onclick="switchTab('pub')">📢 公共</button>
       <button class="board-tab"        id="tab-priv"    onclick="switchTab('priv')">📨 私信</button>
+      <button class="board-tab"        id="tab-adv"     onclick="switchTab('adv')">🎲 奇遇</button>
       <button class="board-tab"        id="tab-special" onclick="switchTab('special')">✨ 特殊</button>
     </div>
 
-    <!-- 三个面板 -->
+    <!-- 四个面板 -->
     <div class="board-panels">
       <!-- 公共事件 -->
       <div class="board-panel active" id="panel-pub">
@@ -375,12 +452,20 @@
           </div>
         </div>
       </div>
+
+      <!-- 奇遇事件 -->
+      <div class="board-panel" id="panel-adv" style="display:none">
+        <div class="board-empty" id="adv-empty">🎲 暂无奇遇<br><span style="font-size:11px;color:#222">在地图上游走，或靠近特殊地点触发奇遇...</span></div>
+      </div>
     </div>
 
     <!-- 居民列表 -->
     <div class="char-list">
-      <div class="char-list-title">👥 今日在场居民</div>
-      <div class="char-grid" id="charListContent"></div>
+      <div class="section-header">
+        <span class="section-label">👥 今日在场居民</span>
+        <button class="collapse-btn" onclick="toggleSection('charListContent', this)">收起</button>
+      </div>
+      <div class="char-grid collapsible" id="charListContent"></div>
     </div>
   </div>
 </div>
@@ -396,29 +481,94 @@ const W = Math.round(MAP_W * SCALE), H = Math.round(MAP_H * SCALE);
 canvas.width = W; canvas.height = H;
 
 const mapImg    = new Image(); mapImg.src = 'assets/map_full.png';
+const mapImgR   = new Image(); mapImgR.src = 'assets/map_right.png';
 const charSheet = new Image(); charSheet.src = 'assets/characters/roguelikeChar_transparent.png';
 let loadedCount = 0, gameReady = false;
 function onLoad() {
-  if (++loadedCount >= 2) {
+  if (++loadedCount >= 3) {
     gameReady = true;
     document.getElementById('statusBar').textContent = '小镇居民们开始了新的一天...';
     renderCharList();
   }
 }
 mapImg.onload = onLoad; mapImg.onerror = onLoad;
+mapImgR.onload = onLoad; mapImgR.onerror = onLoad;
 charSheet.onload = onLoad; charSheet.onerror = onLoad;
+
+// 当前地图：'left' | 'right'
+let currentMap = 'left';
+const TRANSITION_ZONE = 30;
+
+// ===== 点击移动 =====
+let manualMode = false; // true = 手动控制，停止自动游走
+let lastClickTime = 0;
+
+canvas.addEventListener('click', (e) => {
+  const now = Date.now();
+  if (now - lastClickTime < 300) return; // 忽略双击的第一次 click
+  lastClickTime = now;
+  if (!myAgent) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width, scaleY = H / rect.height;
+  const cx = (e.clientX - rect.left) * scaleX;
+  const cy = (e.clientY - rect.top)  * scaleY;
+
+  // 检查互动按钮点击
+  if (cx >= BTN_INTERACT.x && cx <= BTN_INTERACT.x + BTN_INTERACT.w &&
+      cy >= BTN_INTERACT.y && cy <= BTN_INTERACT.y + BTN_INTERACT.h) {
+    if (activeInteraction) {
+      // 结束当前互动
+      activeInteraction = null;
+      manualMode = false; pickTarget(myAgent);
+      setStatus('✅ 结束互动，恢复自动游走');
+    } else if (nearInteractionObj) {
+      // 开始新互动
+      activeInteraction = { ...nearInteractionObj, startFrame: frameCount };
+      manualMode = true; myAgent.state = 'idle';
+      setStatus(`✨ ${nearInteractionObj.label.replace(/^[^\s]+\s/,'')}中...`);
+    }
+    return;
+  }
+
+  manualMode = true;
+  myAgent.targetX = Math.max(20, Math.min(W-20, cx));
+  myAgent.targetY = Math.max(20, Math.min(H-20, cy));
+  myAgent.state = 'walking';
+  myAgent.idleTimer = 0;
+  setStatus('🖱️ 点击移动中... 双击恢复自动游走');
+});
+
+canvas.addEventListener('dblclick', (e) => {
+  if (!myAgent) return;
+  manualMode = false;
+  pickTarget(myAgent);
+  setStatus('🔄 恢复自动游走');
+});
 
 // =============================================
 // 公告栏 Tab 切换
 // =============================================
 function switchTab(tab) {
-  ['pub','priv','special'].forEach(t => {
+  ['pub','priv','adv','special'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
     const panel = document.getElementById(`panel-${t}`);
     panel.classList.toggle('active', t === tab);
     if (t === tab) panel.style.display = 'flex';
     else panel.style.display = 'none';
   });
+}
+
+function toggleCharPanel() {
+  const body = document.getElementById('char-panel-body');
+  const btn  = document.querySelector('#char-panel .panel-toggle');
+  const hidden = body.classList.toggle('hidden');
+  btn.textContent = hidden ? '展开' : '收起';
+}
+
+function toggleSection(id, btn) {
+  const el = document.getElementById(id);
+  const hidden = el.classList.toggle('collapsed');
+  btn.textContent = hidden ? '展开' : '收起';
 }
 
 // =============================================
@@ -507,6 +657,13 @@ const SPOTS = [
   {name:'篮球场',x:375,y:560},{name:'游泳池',x:165,y:508},
   {name:'河边栈道',x:946,y:272},{name:'森林小道',x:1020,y:170},
 ];
+const SPOTS_RIGHT = [
+  {name:'矿洞',x:480,y:120},{name:'篝火',x:560,y:290},
+  {name:'花圃',x:480,y:250},{name:'帐篷营地',x:200,y:480},
+  {name:'迷宫',x:820,y:380},{name:'摩天轮',x:980,y:330},
+  {name:'雪山',x:880,y:120},{name:'天文台',x:1020,y:100},
+  {name:'旋转木马',x:1020,y:480},{name:'过山车',x:850,y:520},
+];
 
 const CHAR_DATA = [
   {id:0,name:'阿橘',  dept:'研发部',personality:'话少闷骚',  interests:'写代码、喝茶',  color:'#FF6D3A',sc:2, sr:0,birthday:'01-15'},
@@ -553,8 +710,9 @@ function updateOnlineCount() {
 // =============================================
 function pickTarget(a) {
   let tx, ty;
+  const spots = currentMap === 'right' ? SPOTS_RIGHT : SPOTS;
   if (Math.random() < 0.6) {
-    const s = SPOTS[Math.floor(Math.random()*SPOTS.length)];
+    const s = spots[Math.floor(Math.random()*spots.length)];
     tx = s.x+(Math.random()-.5)*90; ty = s.y+(Math.random()-.5)*70;
   } else { tx = 30+Math.random()*(W-60); ty = 30+Math.random()*(H-60); }
   a.targetX = Math.max(20,Math.min(W-20,tx));
@@ -564,6 +722,16 @@ function pickTarget(a) {
 function updateAgent(a) {
   a.frame++;
   if (a.state==='chatting') { if(--a.chatTimer<=0){a.state='idle';a.idleTimer=60+Math.random()*80;} return; }
+  // 手动模式：到达目标后停止，不再 pickTarget
+  if (a.isPlayer && manualMode) {
+    const dx=a.targetX-a.x, dy=a.targetY-a.y, dist=Math.sqrt(dx*dx+dy*dy);
+    if (dist<4) { a.state='idle'; return; }
+    a.state='walking';
+    const spd = 1.5;
+    a.x = Math.max(20,Math.min(W-20, a.x+(dx/dist)*spd));
+    a.y = Math.max(20,Math.min(H-20, a.y+(dy/dist)*spd));
+    return;
+  }
   if (a.idleTimer>0) { a.idleTimer--; a.state='idle'; if(a.idleTimer<=0) pickTarget(a); return; }
   a.state = 'walking';
   const dx=a.targetX-a.x, dy=a.targetY-a.y, dist=Math.sqrt(dx*dx+dy*dy);
@@ -705,9 +873,11 @@ let activeAPICalls=0, frameCount=0;
 const MAX_API=2;
 
 function getLocName(x,y) {
-  let near=SPOTS[0],minD=Infinity;
-  for(const s of SPOTS){const d=(x-s.x)**2+(y-s.y)**2;if(d<minD){minD=d;near=s;}}
-  return minD<160*160?near.name+'附近':'小镇街道上';
+  const spots = currentMap === 'right' ? SPOTS_RIGHT : SPOTS;
+  const fallback = currentMap === 'right' ? '郊外小路上' : '小镇街道上';
+  let near=spots[0],minD=Infinity;
+  for(const s of spots){const d=(x-s.x)**2+(y-s.y)**2;if(d<minD){minD=d;near=s;}}
+  return minD<160*160?near.name+'附近':fallback;
 }
 
 function checkProximity() {
@@ -803,6 +973,234 @@ async function callAPI(cA, cB, loc, broadcast=false) {
   } finally { clearTimeout(timer); activeAPICalls--; }
 }
 
+// =============================================
+// 奇遇事件系统
+// =============================================
+let lastAdventureFrame = -3600; // 冷却：60秒(3600帧)
+const ADV_COOLDOWN = 3600;
+
+// 触发条件：靠近特殊地点 + 概率
+const ADV_SPOTS = [
+  {name:'矿洞', map:'right', x:480, y:120, prob:0.4, theme:'洞穴探险'},
+  {name:'篝火', map:'right', x:560, y:290, prob:0.35, theme:'篝火旁'},
+  {name:'迷宫', map:'right', x:820, y:380, prob:0.35, theme:'迷宫'},
+  {name:'摩天轮', map:'right', x:980, y:330, prob:0.3, theme:'游乐场'},
+  {name:'雪山', map:'right', x:880, y:120, prob:0.3, theme:'雪山'},
+  {name:'河边栈道', map:'left', x:946, y:272, prob:0.3, theme:'河边'},
+  {name:'森林小道', map:'left', x:1020, y:170, prob:0.3, theme:'森林'},
+  {name:'游泳池', map:'left', x:165, y:508, prob:0.25, theme:'泳池'},
+];
+
+function checkAdventure() {
+  if (!myAgent || activeAPICalls >= MAX_API) return;
+  if (frameCount - lastAdventureFrame < ADV_COOLDOWN) return;
+  for (const sp of ADV_SPOTS) {
+    if (sp.map !== currentMap) continue;
+    const d = Math.hypot(myAgent.x - sp.x, myAgent.y - sp.y);
+    if (d < 80 && Math.random() < 0.0003) { // ~3.5%概率/分钟，保持远低于5%
+      lastAdventureFrame = frameCount;
+      triggerAdventure(sp);
+      break;
+    }
+  }
+}
+
+// =============================================
+// 互动设施（秋千 / 摩天轮 / 观星台）
+// =============================================
+const INTERACT_OBJECTS = [
+  { id:'swing',    label:'🎠 荡秋千',  map:'left',  x:745, y:410, radius:55, duration:480 },
+  { id:'ferris',   label:'🎡 乘摩天轮', map:'right', x:985, y:330, radius:65, duration:600 },
+  { id:'stardeck', label:'🔭 看星星',  map:'right', x:880, y:120, radius:55, duration:420 },
+];
+let activeInteraction  = null; // { ...obj, startFrame }
+let nearInteractionObj = null;
+const BTN_INTERACT = { x:0, y:0, w:0, h:0 };
+
+function checkInteractions() {
+  if (!myAgent) return;
+  // Auto-end when duration expires
+  if (activeInteraction && frameCount - activeInteraction.startFrame > activeInteraction.duration) {
+    activeInteraction = null;
+    manualMode = false; pickTarget(myAgent);
+    setStatus('✅ 结束互动，恢复自动游走');
+  }
+  nearInteractionObj = null;
+  if (activeInteraction) return;
+  for (const obj of INTERACT_OBJECTS) {
+    if (obj.map !== currentMap) continue;
+    const d = Math.hypot(myAgent.x - obj.x, myAgent.y - obj.y);
+    if (d < obj.radius) { nearInteractionObj = obj; break; }
+  }
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.lineTo(x+w-r, y); c.arcTo(x+w,y, x+w,y+r, r);
+  c.lineTo(x+w, y+h-r); c.arcTo(x+w,y+h, x+w-r,y+h, r);
+  c.lineTo(x+r, y+h); c.arcTo(x,y+h, x,y+h-r, r);
+  c.lineTo(x, y+r); c.arcTo(x,y, x+r,y, r);
+  c.closePath();
+}
+
+function drawFerrisAnim(inter, elapsed) {
+  const cx = inter.x, cy = inter.y - 50;
+  const r = 38, rot = elapsed * 0.012;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,180,30,0.9)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,180,30,0.55)'; ctx.lineWidth = 1.5;
+  for (let i=0;i<6;i++) {
+    const a = rot + i*Math.PI/3;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
+  }
+  const gColors = ['#ff6b9d','#6bffd9','#ffd96b','#6b9dff','#ff9d6b','#9dff6b'];
+  for (let i=0;i<6;i++) {
+    const a = rot + i*Math.PI/3;
+    const gx = cx+Math.cos(a)*r, gy = cy+Math.sin(a)*r;
+    ctx.fillStyle = gColors[i];
+    roundRect(ctx, gx-5, gy-4, 10, 8, 2); ctx.fill();
+  }
+  // Axle
+  ctx.fillStyle='rgba(255,180,30,0.9)';
+  ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawSwingAnim(inter, elapsed) {
+  const cx = inter.x, topY = inter.y - 45;
+  const angle = Math.sin(elapsed * 0.06) * 0.5;
+  const ropeLen = 32;
+  ctx.save();
+  ctx.strokeStyle = '#9a6830'; ctx.lineWidth = 2;
+  for (const dx of [-10, 10]) {
+    ctx.beginPath();
+    ctx.moveTo(cx+dx, topY);
+    ctx.lineTo(cx+dx + Math.sin(angle)*ropeLen, topY + Math.cos(angle)*ropeLen);
+    ctx.stroke();
+  }
+  const sx = cx + Math.sin(angle)*ropeLen;
+  const sy = topY + Math.cos(angle)*ropeLen;
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(sx-13, sy, 26, 5);
+  ctx.restore();
+}
+
+function drawStardeckAnim(inter, elapsed) {
+  ctx.save();
+  ctx.font = '12px serif'; ctx.textAlign = 'center';
+  for (let i=0;i<7;i++) {
+    const a = elapsed*0.02 + i*Math.PI*(2/7);
+    const r = 18 + (i%3)*12;
+    const sx = inter.x + Math.cos(a)*r;
+    const sy = inter.y - 28 + Math.sin(a)*r*0.4;
+    const alpha = 0.55 + 0.45*Math.sin(elapsed*0.08 + i*1.3);
+    ctx.fillStyle = `rgba(255,255,180,${alpha})`;
+    ctx.fillText('★', sx, sy);
+  }
+  ctx.restore();
+}
+
+function drawInteractables() {
+  // Active animation
+  if (activeInteraction) {
+    const el = frameCount - activeInteraction.startFrame;
+    if (activeInteraction.id === 'ferris')   drawFerrisAnim(activeInteraction, el);
+    else if (activeInteraction.id === 'swing') drawSwingAnim(activeInteraction, el);
+    else if (activeInteraction.id === 'stardeck') drawStardeckAnim(activeInteraction, el);
+    // Stop button above player
+    if (myAgent) {
+      BTN_INTERACT.x = myAgent.x-30; BTN_INTERACT.y = myAgent.y-50;
+      BTN_INTERACT.w = 60; BTN_INTERACT.h = 20;
+      ctx.save();
+      ctx.fillStyle='rgba(70,10,10,0.88)';
+      roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 7); ctx.fill();
+      ctx.strokeStyle='#ff5555'; ctx.lineWidth=1;
+      roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 7); ctx.stroke();
+      ctx.fillStyle='#ffaaaa'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('结束互动', myAgent.x, BTN_INTERACT.y+14);
+      ctx.restore();
+    }
+  }
+  // Proximity prompt
+  if (nearInteractionObj && myAgent) {
+    const obj = nearInteractionObj;
+    ctx.save();
+    ctx.strokeStyle=`rgba(255,220,50,${0.45+0.35*Math.sin(frameCount*0.1)})`;
+    ctx.lineWidth=2; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    BTN_INTERACT.x = myAgent.x-42; BTN_INTERACT.y = myAgent.y-52;
+    BTN_INTERACT.w = 84; BTN_INTERACT.h = 23;
+    ctx.fillStyle='rgba(10,10,40,0.92)';
+    roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 8); ctx.fill();
+    ctx.strokeStyle='#FFD700'; ctx.lineWidth=1.5;
+    roundRect(ctx, BTN_INTERACT.x, BTN_INTERACT.y, BTN_INTERACT.w, BTN_INTERACT.h, 8); ctx.stroke();
+    ctx.fillStyle='#FFD700'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(obj.label, myAgent.x, BTN_INTERACT.y+16);
+    ctx.restore();
+  }
+}
+
+let advApiActive = false;
+async function triggerAdventure(spot) {
+  if (advApiActive) return;
+  advApiActive = true;
+  activeAPICalls++;
+  try {
+    const res = await fetch('/api/adventure', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: myAgent.name, dept: myAgent.dept, interests: myAgent.interests,
+        location: spot.name, theme: spot.theme,
+        mood: myAgent.mood, money: myAgent.money,
+      }),
+    });
+    const data = await res.json();
+    if (data.text) {
+      // 更新状态
+      myAgent.mood  = Math.max(0, Math.min(100, myAgent.mood  + (data.moodDelta  || 0)));
+      myAgent.money = Math.max(0,              myAgent.money + (data.moneyDelta || 0));
+      updateCharPanel(myAgent);
+      addAdventureCard(data, spot.name);
+      socket.emit('event:broadcast', {
+        short: `✨ ${myAgent.name} 在${spot.name}触发了奇遇！`,
+        color: myAgent.color,
+      });
+    }
+  } catch(e) { console.error('奇遇API错误:', e); }
+  finally { advApiActive = false; activeAPICalls--; }
+}
+
+function addAdventureCard(data, loc) {
+  const panel = document.getElementById('panel-adv');
+  const empty = document.getElementById('adv-empty');
+  if (empty) empty.remove();
+
+  const effectSign = (data.moneyDelta||0) >= 0 ? '+' : '';
+  const moodSign   = (data.moodDelta||0)  >= 0 ? '+' : '';
+  const effectClass = ((data.moneyDelta||0)+(data.moodDelta||0)) >= 0 ? 'pos' : 'neg';
+  const card = document.createElement('div');
+  card.className = 'adv-card';
+  card.innerHTML = `
+    <div class="adv-header">
+      <span class="adv-icon">${data.icon||'🎲'}</span>
+      <span class="adv-time">${nowTime()}</span>
+    </div>
+    <div class="adv-loc">📍 ${loc}</div>
+    <div class="adv-body">${data.text}</div>
+    <div class="adv-effect ${effectClass}">
+      ${data.moodDelta!=null?`心情 ${moodSign}${data.moodDelta} `:''}
+      ${data.moneyDelta!=null?`金钱 ${effectSign}${data.moneyDelta}`:''}
+    </div>`;
+  panel.insertBefore(card, panel.firstChild);
+  // 自动跳到奇遇 tab
+  switchTab('adv');
+  setStatus(`✨ 奇遇触发：${data.title||loc}`);
+}
+
 async function triggerSpecialTask(nameA, nameB) {
   specialTriggeredToday = true;
   localStorage.setItem(SPECIAL_KEY, '1');
@@ -852,13 +1250,30 @@ function loop() {
     requestAnimationFrame(loop);return;
   }
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  ctx.drawImage(mapImg,0,0,W,H);
+  ctx.drawImage(currentMap==='left' ? mapImg : mapImgR, 0, 0, W, H);
   agents.forEach(updateAgent);
+  // 检测玩家地图边界过渡
+  if (myAgent) {
+    if (currentMap==='left' && myAgent.x >= W - TRANSITION_ZONE) {
+      currentMap = 'right';
+      myAgent.x = TRANSITION_ZONE + 5;
+      myAgent.targetX = TRANSITION_ZONE + 80;
+      setStatus('🌲 进入郊外区域...');
+    } else if (currentMap==='right' && myAgent.x <= TRANSITION_ZONE) {
+      currentMap = 'left';
+      myAgent.x = W - TRANSITION_ZONE - 5;
+      myAgent.targetX = W - TRANSITION_ZONE - 80;
+      setStatus('🏘️ 回到小镇...');
+    }
+  }
   const all=[...agents,...[...remotePlayers.values()].map(rp=>({...rp,_isRemote:true}))];
   all.sort((a,b)=>a.y-b.y).forEach(a=>a._isRemote?drawRemotePlayer(a):drawAgent(a));
   drawWeather();
+  checkInteractions();
+  drawInteractables();
   if(myAgent&&socket&&frameCount%6===0) socket.emit('player:move',{x:myAgent.x,y:myAgent.y,state:myAgent.state});
   if(frameCount%8===0)  checkProximity();
+  if(frameCount%30===0) checkAdventure();
   if(frameCount%60===0) renderCharList();
   frameCount++;
   requestAnimationFrame(loop);
@@ -1067,9 +1482,41 @@ function makeAgent(name,dept,interests,birthday,attrs){
     birthday:birthday?birthday.slice(5):null,color:attrs.topColor,
     x:spawnX,y:spawnY,targetX:0,targetY:0,state:'idle',chatTimer:0,
     idleTimer:40,frame:0,lastEventWith:{},isPlayer:true,pixelAttrs:attrs,
+    mood:80, money:100, // 状态栏初始值
   };
   agents.push(agent);pickTarget(agent);renderCharList();
+  updateCharPanel(agent);
   return agent;
+}
+
+function updateCharPanel(a) {
+  if (!a) return;
+  // 复制预览画布内容
+  const src = document.getElementById('preview-canvas');
+  const dst = document.getElementById('char-panel-canvas');
+  const dc = dst.getContext('2d');
+  dc.clearRect(0,0,64,64);
+  dc.drawImage(src,0,0,64,64);
+
+  const moodColor = a.mood>=70?'#4ade80':a.mood>=40?'#facc15':'#f87171';
+  document.getElementById('char-panel-info').innerHTML = `
+    <div class="panel-info-row"><span class="panel-info-label">名字</span><span class="panel-info-val" style="color:#FFD700;font-size:14px">${a.name}</span></div>
+    <div class="panel-info-row"><span class="panel-info-label">部门</span><span class="panel-info-val">${a.dept}</span></div>
+    <div class="panel-info-row"><span class="panel-info-label">爱好</span><span class="panel-info-val" style="font-size:11px;color:#aaa">${a.interests||'—'}</span></div>
+    <div class="panel-info-row"><span class="panel-info-label">生日</span><span class="panel-info-val" style="font-size:11px;color:#aaa">${a.birthday||'—'}</span></div>
+    <div class="status-stats">
+      <div class="stat-row">
+        <span class="stat-label">心情</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${a.mood}%;background:${moodColor}"></div></div>
+        <span class="stat-val">${a.mood}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">金钱</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${Math.min(a.money,200)/2}%;background:#facc15"></div></div>
+        <span class="stat-val">¥${a.money}</span>
+      </div>
+    </div>
+  `;
 }
 
 function enterTown(){
