@@ -43,6 +43,51 @@ app.post('/api/checkin', (req, res) => {
   res.json({ ok: true, isNew });
 });
 
+// ── 金币排行榜 ──
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
+function readLeaderboard() {
+  try { return JSON.parse(fs.readFileSync(LEADERBOARD_FILE, 'utf8')); }
+  catch { return { weekStart: '', scores: {} }; }
+}
+function saveLeaderboard(data) {
+  fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(data, null, 2));
+}
+function getMondayStr() {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d); mon.setDate(d.getDate() + diff);
+  return mon.toISOString().slice(0, 10);
+}
+function getLeaderboard() {
+  const lb = readLeaderboard();
+  const thisMonday = getMondayStr();
+  if (lb.weekStart !== thisMonday) {
+    lb.weekStart = thisMonday;
+    lb.scores = {};
+    saveLeaderboard(lb);
+  }
+  return lb;
+}
+
+app.get('/api/leaderboard', (req, res) => {
+  const lb = getLeaderboard();
+  const list = Object.entries(lb.scores)
+    .map(([name, d]) => ({ name, dept: d.dept || '', money: d.money || 0 }))
+    .sort((a, b) => b.money - a.money)
+    .slice(0, 20);
+  res.json({ weekStart: lb.weekStart, list });
+});
+
+app.post('/api/update-money', (req, res) => {
+  const { name, dept, money } = req.body;
+  if (!name || money == null) return res.json({ ok: false });
+  const lb = getLeaderboard();
+  lb.scores[name] = { dept: dept || '', money: Number(money) };
+  saveLeaderboard(lb);
+  res.json({ ok: true });
+});
+
 app.get('/api/today-birthdays', (req, res) => {
   const d = new Date();
   const today = `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -81,6 +126,37 @@ app.post('/api/event', async (req, res) => {
   }
 });
 
+// ── 奇遇事件 ──
+app.post('/api/adventure', async (req, res) => {
+  const { name, dept, interests, location, theme, mood, money } = req.body;
+  try {
+    const message = await client.chat.completions.create({
+      model: 'anthropic/claude-haiku-4-5',
+      max_tokens: 200,
+      messages: [
+        { role: 'system', content: `你是像素小镇的奇遇记录员。根据玩家当前状态和地点，生成一个有趣的随机奇遇事件，只返回JSON：
+{
+  "icon": "一个相关emoji",
+  "title": "奇遇标题（5字以内）",
+  "text": "25-50字的第三人称奇遇故事，有趣生动，带意外感",
+  "moodDelta": 心情变化数值（-20到+20的整数），
+  "moneyDelta": 金钱变化数值（-50到+100的整数）
+}
+心情和金钱变化要与故事内容一致。` },
+        { role: 'user', content: `玩家：${name}（${dept}），爱好：${interests}
+当前地点：${location}（${theme}场景）
+当前心情：${mood}/100，金钱：¥${money}` }
+      ]
+    });
+    const raw = message.choices[0].message.content.trim();
+    const obj = JSON.parse(raw.match(/\{[\s\S]*\}/)[0]);
+    res.json(obj);
+  } catch(e) {
+    console.error('奇遇API错误:', e.message);
+    res.status(500).json({ error: '奇遇生成失败' });
+  }
+});
+
 // ── 特殊任务 ──
 app.post('/api/special-task', async (req, res) => {
   const { nameA, nameB } = req.body;
@@ -111,6 +187,30 @@ app.post('/api/special-task', async (req, res) => {
 // ── Socket.io 实时多人 ──
 const onlinePlayers = new Map();
 
+// ── 心愿条（全局，持久化）──
+const WISHES_FILE = path.join(__dirname, 'wishes.json');
+function loadWishes() {
+  try { return JSON.parse(fs.readFileSync(WISHES_FILE, 'utf8')); }
+  catch { return []; }
+}
+function saveWishes() {
+  fs.writeFileSync(WISHES_FILE, JSON.stringify(wishes, null, 2));
+}
+let wishes = loadWishes();
+
+// ── 便利贴（按场所存储，持久化）──
+const STICKY_FILE = path.join(__dirname, 'stickynotes.json');
+function loadStickyNotes() {
+  try { return JSON.parse(fs.readFileSync(STICKY_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveStickyNotes() {
+  fs.writeFileSync(STICKY_FILE, JSON.stringify(stickyNotes, null, 2));
+}
+const stickyNotes = loadStickyNotes();
+
+// ── 玩家发言 ──
+
 io.on('connection', (socket) => {
   socket.emit('players:all', [...onlinePlayers.values()]);
 
@@ -123,6 +223,7 @@ io.on('connection', (socket) => {
       x: data.x, y: data.y,
       state: 'idle',
       specialEnabled: !!data.specialEnabled,
+      interaction: null,
     };
     onlinePlayers.set(socket.id, player);
     socket.broadcast.emit('player:join', player);
@@ -134,6 +235,15 @@ io.on('connection', (socket) => {
     if (p) {
       p.x = x; p.y = y; p.state = state;
       socket.broadcast.emit('player:move', { id: socket.id, x, y, state });
+    }
+  });
+
+  // 互动场景状态广播
+  socket.on('player:interaction', ({ id }) => {
+    const p = onlinePlayers.get(socket.id);
+    if (p) {
+      p.interaction = id || null;
+      socket.broadcast.emit('player:interaction', { id: socket.id, interaction: id || null });
     }
   });
 
@@ -159,6 +269,87 @@ io.on('connection', (socket) => {
   // 新居民首次入镇广播
   socket.on('player:new-arrival', ({ name, dept }) => {
     io.emit('new:arrival', { name, dept });
+  });
+
+  // 玩家发言气泡
+  socket.on('player:say', ({ text }) => {
+    const p = onlinePlayers.get(socket.id);
+    if (!p) return;
+    const safe = String(text || '').slice(0, 30).trim();
+    if (!safe) return;
+    io.emit('player:say', { id: socket.id, name: p.name, text: safe });
+  });
+
+  // 便利贴：获取
+  socket.on('sticky:get', ({ venue }) => {
+    socket.emit('sticky:update', { venue, notes: stickyNotes[venue] || [] });
+  });
+
+  // 便利贴：发布
+  socket.on('sticky:post', ({ venue, author, text }) => {
+    if (!venue || !author || !text) return;
+    if (!stickyNotes[venue]) stickyNotes[venue] = [];
+    if (stickyNotes[venue].length >= 30) stickyNotes[venue].shift();
+    const note = { id: Date.now() + '_' + Math.random().toString(36).slice(2), author, text: String(text).slice(0,50), timestamp: Date.now(), replies: [] };
+    stickyNotes[venue].push(note);
+    saveStickyNotes();
+    io.emit('sticky:update', { venue, notes: stickyNotes[venue] });
+  });
+
+  // 便利贴：回复
+  socket.on('sticky:reply', ({ venue, noteId, author, text }) => {
+    const notes = stickyNotes[venue] || [];
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    if (note.replies.length >= 10) note.replies.shift();
+    note.replies.push({ author, text: String(text).slice(0,40), timestamp: Date.now() });
+    saveStickyNotes();
+    io.emit('sticky:update', { venue, notes });
+  });
+
+  // 心愿条：获取
+  socket.on('wish:get', ({ name }) => {
+    socket.emit('wish:all', wishes.map(w => ({
+      ...w,
+      hidden: w.hidden && w.author !== name ? undefined : w.hidden
+    })));
+  });
+
+  // 心愿条：发布
+  socket.on('wish:post', ({ author, text }) => {
+    if (!author || !text) return;
+    if (wishes.length >= 200) wishes.shift();
+    wishes.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2), author, text: String(text).slice(0,60), timestamp: Date.now(), hidden: false });
+    saveWishes();
+    io.emit('wish:all', wishes);
+  });
+
+  // 心愿条：删除（仅作者）
+  socket.on('wish:delete', ({ author, id }) => {
+    const idx = wishes.findIndex(w => w.id === id && w.author === author);
+    if (idx === -1) return;
+    wishes.splice(idx, 1);
+    saveWishes();
+    io.emit('wish:all', wishes);
+  });
+
+  // 心愿条：隐藏/显示（仅作者，不真正删除）
+  socket.on('wish:hide', ({ author, id }) => {
+    const w = wishes.find(w => w.id === id && w.author === author);
+    if (!w) return;
+    w.hidden = !w.hidden;
+    saveWishes();
+    io.emit('wish:all', wishes);
+  });
+
+  // 便利贴：删除（仅作者本人）
+  socket.on('sticky:delete', ({ venue, noteId, author }) => {
+    if (!stickyNotes[venue]) return;
+    const idx = stickyNotes[venue].findIndex(n => n.id === noteId && n.author === author);
+    if (idx === -1) return;
+    stickyNotes[venue].splice(idx, 1);
+    saveStickyNotes();
+    io.emit('sticky:update', { venue, notes: stickyNotes[venue] });
   });
 
   socket.on('disconnect', () => {
